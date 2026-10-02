@@ -27,75 +27,54 @@ def root():
 def health():
     return {"status": "ok", "model_loaded": pipeline is not None}
 
-@app.post("/predict", response_model=SentimentResponse)
+# @app.post("/predict", response_model=SentimentResponse)
+# def predict(request: SentimentRequest):
+#     if pipeline is None:
+#         raise HTTPException(status_code=503, detail="Model not loaded.")
+
+#     pred = pipeline.predict([request.text])[0]
+#     label = "positive" if pred == 1 else "negative"
+
+#     confidence = None
+#     if hasattr(pipeline, "predict_proba"):
+#         confidence = float(pipeline.predict_proba([request.text]).max())
+
+#     return SentimentResponse(sentiment=label, confidence=confidence)
+
+@app.post("/predict")
 def predict(request: SentimentRequest):
-    if pipeline is None:
-        raise HTTPException(status_code=503, detail="Model not loaded.")
 
-    pred = pipeline.predict([request.text])[0]
-    label = "positive" if pred == 1 else "negative"
+    start_time = time.time()
 
-    confidence = None
-    if hasattr(pipeline, "predict_proba"):
-        confidence = float(pipeline.predict_proba([request.text]).max())
+    logger.info("Prediction request received")
 
-    return SentimentResponse(sentiment=label, confidence=confidence)
+    prediction = model.predict([request.text])[0]
 
-from fastapi.responses import HTMLResponse
+    response_time = time.time() - start_time
+
+    logger.info(
+        "Prediction completed | prediction=%s | response_time=%.3f",
+        prediction,
+        response_time
+    )
+
+    return {
+        "prediction": prediction
+    }
 
 import logging
 import time
-import json
-from datetime import datetime, timezone
 
-from fastapi import FastAPI, Request
+logging.basicConfig(level=logging.INFO)
 
-# --- Basic logging setup -----------------------------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(message)s",
-)
-logger = logging.getLogger("ml_api")
+logger = logging.getLogger(__name__)
 
 
-def log_prediction_event(request_body: dict, prediction: dict, latency_ms: float):
-    """Log a single prediction event as structured JSON.
-
-    In a real production system, this would go to a log aggregator
-    (e.g., CloudWatch, Datadog, ELK) rather than stdout — but the
-    structured format is the same idea.
-    """
-    event = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "input": request_body,
-        "output": prediction,
-        "latency_ms": round(latency_ms, 2),
-    }
-    logger.info(json.dumps(event))
 
 
-def add_monitoring_middleware(app: FastAPI):
-    """Attach a middleware that times every request and logs basic metrics."""
-
-    @app.middleware("http")
-    async def monitor_requests(request: Request, call_next):
-        start = time.perf_counter()
-        response = await call_next(request)
-        latency_ms = (time.perf_counter() - start) * 1000
-
-        logger.info(json.dumps({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "path": request.url.path,
-            "method": request.method,
-            "status_code": response.status_code,
-            "latency_ms": round(latency_ms, 2),
-        }))
-
-        return response
-
-    return app
 
 
+from fastapi.responses import HTMLResponse
 @app.get("/test", response_class=HTMLResponse)
 def test_page():
     return """
