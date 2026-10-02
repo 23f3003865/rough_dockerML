@@ -41,6 +41,14 @@ def health():
 
 #     return SentimentResponse(sentiment=label, confidence=confidence)
 
+
+import logging
+import time
+
+logging.basicConfig(level=logging.INFO)
+
+logger = logging.getLogger(__name__)
+
 @app.post("/predict")
 def predict(request: SentimentRequest):
 
@@ -61,13 +69,6 @@ def predict(request: SentimentRequest):
     return {
         "prediction": prediction
     }
-
-import logging
-import time
-
-logging.basicConfig(level=logging.INFO)
-
-logger = logging.getLogger(__name__)
 
 
 
